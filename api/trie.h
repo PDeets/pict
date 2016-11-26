@@ -61,10 +61,10 @@ public:
     //
     // returns false if insert failed (OutOfMemory)
     //
-    bool insert( Col &t )
+    bool insert( const Col &t )
     {
         trienode<typename Col::value_type>* current = m_root;
-        for( typename Col::iterator ic = t.begin(); ic != t.end(); ++ic )
+        for( typename Col::const_iterator ic = t.begin(); ic != t.end(); ++ic )
         {
             typename TNodeCol::iterator found;
             found = current->children.find( *ic );
@@ -98,7 +98,7 @@ public:
     // this is for perf reasons; memory usage is not that important
     // the whole structure will be torn down in d'tor
     //
-    void erase( Col& t )
+    void erase( const Col& t )
     {
         trienode<typename Col::value_type>* node = pfind( t );
         if( NULL == node ) return;
@@ -108,7 +108,7 @@ public:
     //
     //
     //
-    bool find_prefix( Col &t )
+    bool find_prefix( const Col &t )
     {
         return( pfind_prefix( t ) != NULL );
     }
@@ -119,10 +119,10 @@ private:
     //
     //
     //
-    trienode<typename Col::value_type>* pfind( Col &t )
+    trienode<typename Col::value_type>* pfind( const Col &t )
     {
         trienode<typename Col::value_type> *current = m_root;
-        for( typename Col::iterator ic = t.begin(); ic != t.end(); ++ic )
+        for( typename Col::const_iterator ic = t.begin(); ic != t.end(); ++ic )
         {
             typename TNodeCol::iterator found = current->children.find( *ic );
             if( found == current->children.end() ) return( NULL );
@@ -135,10 +135,10 @@ private:
     //
     //
     //
-    trienode<typename Col::value_type>* pfind_prefix( Col &t )
+    trienode<typename Col::value_type>* pfind_prefix( const Col &t )
     {
         trienode<typename Col::value_type> *current = m_root;
-        for( typename Col::iterator ic = t.begin(); ic != t.end(); ++ic )
+        for( typename Col::const_iterator ic = t.begin(); ic != t.end(); ++ic )
         {
             typename TNodeCol::iterator found = current->children.find( *ic );
             if( found == current->children.end() ) return( NULL );

@@ -173,7 +173,7 @@ int Combination::AddBinding()
 //  else iterate over all values
 // Terminate recursion: set result value excluded, update count
 //
-void Combination::applyExclusion( Exclusion& excl, int index, ParamCollection::iterator pos )
+void Combination::applyExclusion( const Exclusion& excl, int index, ParamCollection::iterator pos )
 {
     if( m_params.end() == pos )
     {
@@ -210,7 +210,7 @@ void Combination::applyExclusion( Exclusion& excl, int index, ParamCollection::i
 //
 //
 //
-void Combination::ApplyExclusion( Exclusion& excl )
+void Combination::ApplyExclusion( const Exclusion& excl )
 {
     // only if this exclusion's parameters exist in the combo
     for( Exclusion::iterator it = excl.begin(); it != excl.end(); ++it )

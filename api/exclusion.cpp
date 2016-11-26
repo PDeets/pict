@@ -7,7 +7,7 @@ namespace pictcore
 // this is to verify whether a is contained within b.
 // if it's true, b is obsolete.
 //
-bool contained( Exclusion &a, Exclusion &b )
+bool contained( const Exclusion &a, const Exclusion &b )
 {
     if( b.size() < a.size() ) return( false );
 
@@ -127,9 +127,9 @@ bool ExclusionSizeLess::operator() ( const Exclusion &excl1, const Exclusion &ex
 //
 //
 //
-bool ExclIterCollectionPred::operator() ( const ExclusionCollection::iterator excl1, const ExclusionCollection::iterator excl2 ) const
+bool ExclIterCollectionPred::operator() ( const ExclusionCollectionWithDeriverData::iterator excl1, const ExclusionCollectionWithDeriverData::iterator excl2 ) const
 {
-    return( -1 == compareExclusions( *excl1, *excl2 ) );
+    return( -1 == compareExclusions( excl1->first, excl2->first ) );
 }
 
 }

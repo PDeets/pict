@@ -23,7 +23,7 @@ bool CGcdData::CheckEntireParameterExcluded()
     {
         if( 1 == exclusion.size() )
         {
-            ExclusionTerm& term = const_cast<ExclusionTerm&> ( *( exclusion.begin() ) );
+            const ExclusionTerm& term = *( exclusion.begin() );
             auto result = paramMap.insert( make_pair( term.first, emptySet ) );
 
             set< int >& values = ( result.first )->second;
@@ -60,7 +60,7 @@ wstrings CGcdData::GetSingleItemExclusions()
     {
         if( 1 == exclusion.size() )
         {
-            ExclusionTerm& term = const_cast<ExclusionTerm&> ( * exclusion.begin() );
+            const ExclusionTerm& term = *exclusion.begin();
             auto found = _modelData.FindParameterByGcdPointer( term.first );
             assert( found != _modelData.Parameters.end() );
 
@@ -295,7 +295,7 @@ ErrorCode CGcdData::TranslateToGCD()
     //  2. no lower subtree satisfies the condition 1)
     for( auto & excl : Exclusions )
     {
-        _task.AddExclusion( const_cast<Exclusion&> ( excl ) );
+        _task.AddExclusion( excl );
     }
 
     _task.PrepareForGeneration();

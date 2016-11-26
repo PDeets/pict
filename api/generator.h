@@ -107,6 +107,7 @@ class Model;
 class Parameter;
 class Combination;
 class Exclusion;
+class ExclusionDeriverData;
 class WorkList;
 
 //
@@ -207,7 +208,7 @@ typedef std::pair<Parameter *, int> ExclusionTerm;
 
 int compareExclusionTerms( const ExclusionTerm& op1, const ExclusionTerm& op2 );
 int compareExclusions( const Exclusion& op1, const Exclusion& op2 );
-extern bool contained( Exclusion &a, Exclusion &b );
+extern bool contained( const Exclusion &a, const Exclusion &b );
 
 // exclusions have to be sorted by size when they enter ProcessExclusions()
 // otherwise correct combinations will not be created and generation will fail
@@ -217,13 +218,14 @@ public:
     bool operator() ( const Exclusion &excl1, const Exclusion &excl2 ) const;
 };
 typedef std::set<Exclusion, ExclusionSizeLess> ExclusionCollection;
+typedef std::map<Exclusion, ExclusionDeriverData, ExclusionSizeLess> ExclusionCollectionWithDeriverData;
 
 class ExclIterCollectionPred
 {
 public:
-    bool operator() ( const ExclusionCollection::iterator excl1, const ExclusionCollection::iterator excl2 ) const;
+    bool operator() ( const ExclusionCollectionWithDeriverData::iterator excl1, const ExclusionCollectionWithDeriverData::iterator excl2 ) const;
 };
-typedef std::set<ExclusionCollection::iterator, ExclIterCollectionPred> ExclIterCollection;
+typedef std::set<ExclusionCollectionWithDeriverData::iterator, ExclIterCollectionPred> ExclIterCollection;
 
 class ExclusionTermCompare
 {
@@ -245,7 +247,7 @@ public:
     typedef _Exclusion::const_reference                   const_reference;
     typedef _Exclusion::value_type                        value_type;
 
-    Exclusion() : m_deleted( false ) {}
+    Exclusion() {}
 
     iterator       begin()       { return( col.begin() ); }
     iterator       end()         { return( col.end() ); }
@@ -254,17 +256,9 @@ public:
     size_t size()  const         { return( col.size() ); }
     bool   empty() const         { return( col.empty() ); }
 
-    // exclusion represented as a list, for next_permutation to work
-    _ExclusionVec::iterator lbegin() { return( vec.begin() ); }
-    _ExclusionVec::iterator lend()   { return( vec.end() ); }
-    _ExclusionVec &GetList()         { return( vec ); }
-
     std::pair<iterator, bool> insert( const ExclusionTerm& Term )
     {
-        std::pair<iterator, bool> ret = col.insert( Term );
-        if( ret.second ) vec.push_back( Term );
-        assert( col.size() == vec.size() );
-        return ret;
+        return col.insert(Term);
     }
 
     // for inserter() to work we need two-param insert
@@ -277,17 +271,32 @@ public:
         return( size() != Excl.size() ? size() < Excl.size() : -1 == compareExclusions( *this, Excl ) );
     }
 
-    void markDeleted() { m_deleted = true; }
-    bool isDeleted() const { return( m_deleted ); }
-
     size_t ResultParamCount() const;
 
     void Print() const;
 
 private:
     _Exclusion    col;
+};
+
+class ExclusionDeriverData
+{
+public:
+    typedef std::vector<ExclusionTerm>                    _ExclusionVec;
+
+    ExclusionDeriverData(const Exclusion& excl);
+
+    // exclusion represented as a list, for next_permutation to work
+    _ExclusionVec::iterator begin() { return(vec.begin()); }
+    _ExclusionVec::iterator end() { return(vec.end()); }
+    const _ExclusionVec &GetList() const { return(vec); }
+
+    void markDeleted() { m_deleted = true; }
+    bool isDeleted() const { return(m_deleted); }
+
+private:
     _ExclusionVec vec;
-    bool m_deleted;
+    bool m_deleted = false;
 };
 
 //
@@ -322,7 +331,7 @@ public:
     ComboStatus Feasible  ( int n );
     int         Feasible();
 
-    void ApplyExclusion( Exclusion& excl );
+    void ApplyExclusion( const Exclusion& excl );
     bool ViolatesExclusion();
 
     ParamCollection& GetParameters() { return m_params; }
@@ -353,7 +362,7 @@ private:
 
     Model* m_model;
 
-    void applyExclusion( Exclusion& excl, int index, ParamCollection::iterator pos );
+    void applyExclusion( const Exclusion& excl, int index, ParamCollection::iterator pos );
 };
 
 // Combinations pointers in ComboCollection should be sorted by id and not by memory location
@@ -429,14 +438,14 @@ public:
     ComboCollection::const_iterator GetCombinationBegin() { return m_combinations.begin(); }
     ComboCollection::const_iterator GetCombinationEnd()   { return m_combinations.end(); }
 
-    void LinkExclusion( ExclusionCollection::iterator iter )
+    void LinkExclusion( ExclusionCollectionWithDeriverData::iterator iter )
     {
-        m_avgExclusionSize = ( m_avgExclusionSize * (float) m_exclusions.size() + (float) iter->size() ) / (float) ( m_exclusions.size() + 1 );
+        m_avgExclusionSize = ( m_avgExclusionSize * (float) m_exclusions.size() + (float) iter->first.size() ) / (float) ( m_exclusions.size() + 1 );
         std::pair<ExclIterCollection::iterator, bool> ret = m_exclusions.insert( iter );
         assert( ret.second );
     }
 
-    void UnlinkExclusion( ExclusionCollection::iterator Iter )
+    void UnlinkExclusion( ExclusionCollectionWithDeriverData::iterator Iter )
     {
         size_t erased = m_exclusions.erase( Iter );
         assert( 1 == erased );
@@ -520,7 +529,7 @@ public:
     void Generate();             // entry point of the generation
     GenerationType GetGenerationType() { return( m_generationType ); }
 
-    bool AddExclusion( Exclusion& e )
+    bool AddExclusion( const Exclusion& e )
     {
         std::pair<ExclusionCollection::iterator, bool> ret = m_exclusions.insert( e );
         return( ret.second );
@@ -649,7 +658,7 @@ private:
     void mapRowSeedsToPseudoParameters();
     void deriveSubmodelExclusions();
     bool rowViolatesExclusion( ResultRow& row );
-    bool rowViolatesExclusion( Exclusion& row );
+    bool rowViolatesExclusion( const Exclusion& row );
 
     void markUndefinedValuesInResultParams();
 
@@ -684,7 +693,7 @@ public:
 
     void SetAbortCallback( AbortCallbackFunc func ) { m_abortCallback = func; }
     
-    bool AddExclusion( Exclusion& excl )
+    bool AddExclusion( const Exclusion& excl )
     {
         std::pair<ExclusionCollection::iterator, bool> ret = m_exclusions.insert( excl );
         return( ret.second );
@@ -723,7 +732,7 @@ private:
     // generate a random row before giving up
     size_t              m_maxRandomTries; 
 
-    Model* findMatchingNode( Exclusion& exclusion, Model* root );
+    Model* findMatchingNode( const Exclusion& exclusion, Model* root );
     bool findParamInSubtree( Parameter* param, Model* root );
     void deriveExclusions();
 

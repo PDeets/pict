@@ -1116,13 +1116,16 @@ void Model::deriveSubmodelExclusions()
     {
         for( ExclusionCollection::iterator i_e = m_exclusions.begin(); i_e != m_exclusions.end(); ++i_e )
         {
-            deriver.AddExclusion( const_cast<Exclusion&> ( *i_e ), true );
+            deriver.AddExclusion( *i_e );
         }
         deriver.DeriveExclusions();
 
         // must clear because some initial exclusions may have been removed during derivation as obsolete
         m_exclusions.clear();
-        __insert( m_exclusions, deriver.GetExclusions().begin(), deriver.GetExclusions().end() );
+        for (const ExclusionCollectionWithDeriverData::value_type& exclusionPair : deriver.GetExclusions())
+        {
+            m_exclusions.insert(exclusionPair.first);
+        }
     }
 }
 
@@ -1210,7 +1213,7 @@ void Model::processExclusions( ComboCollection& vecCombo )
             // all exclusions must be applied to the combo and not just the current one
             for( ExclusionCollection::iterator ie = m_exclusions.begin(); ie != m_exclusions.end(); ++ie )
             {
-                ( *ic )->ApplyExclusion( const_cast<Exclusion&> ( *ie ) );
+                ( *ic )->ApplyExclusion( *ie );
             }
         }
     }
@@ -1241,11 +1244,11 @@ bool Model::rowViolatesExclusion( ResultRow& row )
 //
 // the same function but row defined as an Exclusion
 //
-bool Model::rowViolatesExclusion( Exclusion& row )
+bool Model::rowViolatesExclusion( const Exclusion& row )
 {
     for( ExclusionCollection::iterator ie = m_exclusions.begin(); ie != m_exclusions.end(); ++ie )
     {
-        if( contained( const_cast<Exclusion&> ( *ie ), row ) )
+        if( contained( *ie, row ) )
         {
             return( true );
         }
@@ -1348,7 +1351,7 @@ bool seedContained( RowSeed &container, RowSeed &containee )
 //
 //
 //
-bool seedViolatesExclusion( RowSeed &seed, Exclusion &exclusion )
+bool seedViolatesExclusion( RowSeed &seed, const Exclusion &exclusion )
 {
     // exclusion has to have all its elements matching exacly some element in the seed
     for( Exclusion::iterator ie = exclusion.begin(); ie != exclusion.end(); ++ie )
@@ -1427,7 +1430,7 @@ void Model::fixRowSeeds()
         RowSeedCollection::iterator is = m_rowSeeds.begin();
         while( is != m_rowSeeds.end() )
         {
-            if( seedViolatesExclusion( *is, const_cast<Exclusion&>( *ie ) ) )
+            if( seedViolatesExclusion( *is, *ie ) )
             {
                 is = m_rowSeeds.erase( is );
             }

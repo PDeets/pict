@@ -79,9 +79,9 @@ void Task::PrepareForGeneration()
     //
     for ( auto & excl : m_exclusions )
     {
-        Model* found = findMatchingNode(const_cast<Exclusion&>( excl ), m_rootModel);
+        Model* found = findMatchingNode(excl, m_rootModel);
         assert( NULL != found );
-        found->AddExclusion( const_cast<Exclusion&>( excl ));
+        found->AddExclusion(excl);
     }
 
     // propagate all row seeds
@@ -114,7 +114,7 @@ ResultCollection::iterator Task::GetNextResultRow()
 // the one that contains all params of the exclusion in its subtree and 
 // none of its children have this property
 //
-Model* Task::findMatchingNode( Exclusion& exclusion, Model* root )
+Model* Task::findMatchingNode( const Exclusion& exclusion, Model* root )
 {
     // can any of the subnodes accommodate the exclusion?
     for( auto & submodel : root->GetSubmodels() )
@@ -177,14 +177,18 @@ void Task::deriveExclusions()
 
     for( auto & excl : m_exclusions )
     {
-        deriver.AddExclusion( const_cast<Exclusion&>( excl ), true );
+        deriver.AddExclusion( excl );
     }
 
     deriver.DeriveExclusions();
     
     // must clear and repopulate the collection with the result of the derivation
     m_exclusions.clear();
-    __insert( m_exclusions, deriver.GetExclusions().begin(), deriver.GetExclusions().end() );
+
+    for (const ExclusionCollectionWithDeriverData::value_type& exclusionPair : deriver.GetExclusions())
+    {
+        m_exclusions.insert(exclusionPair.first);
+    }
 }
 
 }

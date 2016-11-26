@@ -1,8 +1,16 @@
 #include "deriver.h"
+
+#include <iterator>
+
 using namespace std;
 
 namespace pictcore
 {
+
+ExclusionDeriverData::ExclusionDeriverData(const Exclusion& excl)
+{
+    copy(excl.begin(), excl.end(), back_inserter(vec));
+}
 
 //
 // Consistent
@@ -10,11 +18,11 @@ namespace pictcore
 // They're not consistent if they have matching parameters with different values
 // Ignore terms related to the current parameter, which we're covering
 //
-bool ExclusionDeriver::consistent( Exclusion &aa, Exclusion &bb )
+bool ExclusionDeriver::consistent( const Exclusion &aa, const Exclusion &bb )
 {
     // make sure the smaller one is in the outer loop
-    Exclusion *a;
-    Exclusion *b;
+    const Exclusion *a;
+    const Exclusion *b;
     if( aa.size() < bb.size() )
     {
         a = &aa;
@@ -55,25 +63,30 @@ bool ExclusionDeriver::consistent( Exclusion &aa, Exclusion &bb )
 //
 //
 //
-pair<ExclusionCollection::iterator, bool> ExclusionDeriver::AddExclusion( Exclusion& excl, bool checkIfInCollection )
+pair<ExclusionCollectionWithDeriverData::iterator, bool> ExclusionDeriver::AddExclusion( const Exclusion& excl )
 {
     // if there's already an exclusion that's broader, do not add
-    if( checkIfInCollection )
+    ExclusionDeriverData exclusionData{excl};
+    if( alreadyInCollection( exclusionData ) )
     {
-        if( alreadyInCollection( excl ) )
-        {
-            return make_pair( m_exclusions.end(), false );
-        }
+        return make_pair( m_exclusions.end(), false );
     }
 
     // now add
-    pair<ExclusionCollection::iterator, bool> result = m_exclusions.insert( excl );
+    return addNewExclusionWithData(excl, move(exclusionData));
+}
+
+pair<ExclusionCollectionWithDeriverData::iterator, bool> ExclusionDeriver::addNewExclusionWithData(const Exclusion& excl, ExclusionDeriverData&& exclusionData)
+{
+    pair<ExclusionCollectionWithDeriverData::iterator, bool> result = m_exclusions.emplace( excl, move(exclusionData) );
     if( result.second )
     {
+        ExclusionDeriverData& exclusionData = result.first->second;
+
         // later, we will attempt to find sorted lists so 
         // the lookup structure should keep them sorted, too
-        sort( excl.lbegin(), excl.lend() );
-        m_lookup.insert( excl.GetList() );
+        sort( exclusionData.begin(), exclusionData.end() );
+        m_lookup.insert( exclusionData.GetList() );
     }
 
     return result;
@@ -92,20 +105,20 @@ pair<ExclusionCollection::iterator, bool> ExclusionDeriver::AddExclusion( Exclus
 //
 // given an exclusion mark those in the collection which are now obsolete
 //
-void ExclusionDeriver::markObsolete( ExclusionCollection::iterator ie )
+void ExclusionDeriver::markObsolete( ExclusionCollectionWithDeriverData::iterator ie )
 {
     // empty exclusions would obsolete all others; we don't want to remove those
-    if( ie->empty() ) return;
+    if( ie->first.empty() ) return;
 
-    for( ExclusionCollection::iterator im =  m_exclusions.begin();
-                                       im != m_exclusions.end(); 
-                                     ++im )
+    for(ExclusionCollectionWithDeriverData::iterator im =  m_exclusions.begin();
+                                                     im != m_exclusions.end(); 
+                                                   ++im )
     {
         if( ( ie != im )
-         && ( !im->isDeleted() )
-         && contained( const_cast<Exclusion&> ( *ie ), const_cast<Exclusion&>( *im ) ) )
+         && ( !im->second.isDeleted() )
+         && contained( ie->first, im->first ) )
         {
-            markDeleted( const_cast<Exclusion*>( &*im ) );
+            markDeleted( im->second );
         }
     }
 }
@@ -113,9 +126,9 @@ void ExclusionDeriver::markObsolete( ExclusionCollection::iterator ie )
 //
 // Add a pointer to a given exclusion from each referenced parameter
 //
-void AddExclusionParamBackPtrs( ExclusionCollection::iterator& excl )
+void AddExclusionParamBackPtrs(ExclusionCollectionWithDeriverData::iterator& excl )
 {
-    for( Exclusion::iterator i_term = excl->begin(); i_term != excl->end(); ++i_term )
+    for( Exclusion::iterator i_term = excl->first.begin(); i_term != excl->first.end(); ++i_term )
     {
         i_term->first->LinkExclusion( excl );
     }
@@ -136,13 +149,12 @@ void ExclusionDeriver::peformDelete()
     //
 
     // actually delete all marked as deleted
-    ExclusionCollection::iterator ie = m_exclusions.begin();
+    ExclusionCollectionWithDeriverData::iterator ie = m_exclusions.begin();
     while( ie != m_exclusions.end() )
     {
-        if( ie->isDeleted() )
+        if( ie->second.isDeleted() )
         {
-            Exclusion* pExcl = const_cast<Exclusion*>( &*ie );
-            m_lookup.erase( pExcl->GetList() );
+            m_lookup.erase( ie->second.GetList() );
             ie = __map_erase( m_exclusions, ie );
         }
         else
@@ -172,7 +184,7 @@ void ExclusionDeriver::peformDelete()
 //        for this parameter, organized into buckets by value.
 // Also, ProcessExclusions has set up static ptrs to model, parameter
 //
-inline void ExclusionDeriver::buildExclusion( Exclusion& exclImplied, vector<ExclPtrList>::iterator begin )
+inline void ExclusionDeriver::buildExclusion( Exclusion& exclImplied, ExclusionDeriverData&& exclusionDataImplied, vector<ExclPtrList>::iterator begin )
 {
     // derivation can take a long time, use the call back to check if it should be aborted
     if( m_task->AbortGeneration() )
@@ -186,20 +198,22 @@ inline void ExclusionDeriver::buildExclusion( Exclusion& exclImplied, vector<Exc
         for( ExclPtrList::iterator i = begin->begin(); i != begin->end(); ++i )
         {
             // don't bother if the exclusion was already marked obsolete
-            if( ( *i )->isDeleted() ) continue;
+            if( ( *i )->second.isDeleted() ) continue;
 
             // check for contradiction, continue if found
-            if( !consistent( exclImplied, **i ) ) continue; 
+            if( !consistent( exclImplied, (*i)->first ) ) continue; 
 
             // merge the exclusion into the given one to make a new one
             Exclusion excl( exclImplied );
-            for( Exclusion::iterator ie = ( *i )->begin(); ie != ( *i )->end(); ++ie )
+            for( Exclusion::iterator ie = ( *i )->first.begin(); ie != ( *i )->first.end(); ++ie )
             {
                 if( ie->first != m_currentParam )
                 {
                     excl.insert( *ie );
                 }
             }
+
+            ExclusionDeriverData exclusionData{excl};
 
             // checking for being in the collection while still in progress of generation 
             // is just an optimization but it speeds things up considerably
@@ -209,10 +223,10 @@ inline void ExclusionDeriver::buildExclusion( Exclusion& exclImplied, vector<Exc
             // before it reaches a size of 3; very rarely there will be an broader
             // exclusion for size <3
 
-            if( alreadyInCollection( excl ) ) continue;
+            if( alreadyInCollection( exclusionData ) ) continue;
 
             // call buildExclusion on next bucket, passing our exclusion in progress
-            buildExclusion( excl, begin + 1 );
+            buildExclusion( excl, move(exclusionData), begin + 1 );
         }
     }
     else
@@ -220,7 +234,7 @@ inline void ExclusionDeriver::buildExclusion( Exclusion& exclImplied, vector<Exc
         // add new exclusion to model
         //   first  = an iterator to the new exclusion,
         //   second = return whether item was added (true means it wasn't a duplicate)
-        pair<ExclusionCollection::iterator, bool> addResult = AddExclusion( exclImplied, false );
+        pair<ExclusionCollectionWithDeriverData::iterator, bool> addResult = addNewExclusionWithData( exclImplied, move(exclusionDataImplied) );
         if( !addResult.second ) return;
 
         // now go through the collection and mark those that became obsolete
@@ -250,15 +264,15 @@ inline void ExclusionDeriver::buildExclusion( Exclusion& exclImplied, vector<Exc
 // This function makes a use of buckets to check only against those exclusions
 //    in m_exclusions which have at least one element of the given one
 //
-inline bool ExclusionDeriver::alreadyInCollection( Exclusion &excl )
+inline bool ExclusionDeriver::alreadyInCollection( ExclusionDeriverData &excl )
 {
     // for all permutations
-    sort( excl.lbegin(), excl.lend() );
+    sort( excl.begin(), excl.end() );
     bool more = true;
     while( more )
     {
         if( m_lookup.find_prefix( excl.GetList() ) ) return true;
-        more = next_permutation( excl.lbegin(), excl.lend() );
+        more = next_permutation( excl.begin(), excl.end() );
     }
     return false;
 }
@@ -289,13 +303,13 @@ void ExclusionDeriver::DeriveExclusions()
     DOUT( L"Exclusions:\n" );
     for( auto & exclusion : m_exclusions )
     {
-        exclusion.Print();
+        exclusion.first.Print();
     }
     DOUT( L"Derivation: Started\n" );
 
     // Add pointers to referencing exclusions to each parameter
     // for_each(m_exclusions.begin(), m_exclusions.end(), AddExclusionParamBackPtrs);
-    for( ExclusionCollection::iterator ie = m_exclusions.begin(); ie != m_exclusions.end(); ++ie )
+    for( ExclusionCollectionWithDeriverData::iterator ie = m_exclusions.begin(); ie != m_exclusions.end(); ++ie )
     {
         AddExclusionParamBackPtrs( ie );
     }
@@ -323,7 +337,7 @@ void ExclusionDeriver::DeriveExclusions()
               L"\n"; )
 
         // We need buckets to hold the exclusions pertaining to each value
-        vector<list<Exclusion *> > buckets( m_currentParam->GetValueCount() );
+        vector<ExclPtrList> buckets( m_currentParam->GetValueCount() );
 
         for( ExclIterCollection::iterator ie =  m_currentParam->GetExclusions().begin();
                                           ie != m_currentParam->GetExclusions().end();
@@ -331,13 +345,12 @@ void ExclusionDeriver::DeriveExclusions()
         {
             // put ref to each exclusion in appropriate value-relative bucket
             // find this parameter in the exclusion
-            Exclusion::iterator iExcl = find_if( ( *ie )->begin(), ( *ie )->end(),
+            Exclusion::iterator iExcl = find_if( ( *ie )->first.begin(), ( *ie )->first.end(),
                                                  bind2nd( MatchParameterPointer(), m_currentParam ) );
 
             // put the exclusion in the right bucket
-            assert( iExcl != ( *ie )->end() );
-            Exclusion* pExcl = const_cast<Exclusion*>( &**ie );
-            buckets.at( iExcl->second ).push_back( pExcl );
+            assert( iExcl != ( *ie )->first.end() );
+            buckets.at( iExcl->second ).push_back( &**ie );
         }
 
         // if all the buckets have something in them
@@ -352,8 +365,9 @@ void ExclusionDeriver::DeriveExclusions()
 
         // recursively build all cover sets, building up exclusion on other params
         Exclusion exclImplied;
+        ExclusionDeriverData exclusionDataImplied{exclImplied};
         m_end = buckets.end();
-        buildExclusion( exclImplied, buckets.begin() );
+        buildExclusion( exclImplied, move(exclusionDataImplied), buckets.begin() );
 
         peformDelete();
     }
@@ -362,7 +376,7 @@ void ExclusionDeriver::DeriveExclusions()
     DOUT( L"Exclusions:\n" );
     for( auto & exclusion : m_exclusions )
     {
-        exclusion.Print();
+        exclusion.first.Print();
     }
 }
 
