@@ -169,7 +169,9 @@ sub processCommand {
     }
     print STDOUT "$filepath$cmdline \n";
 
-    logText( $out, "\n\n#################################################################\n\n\n" );
+    open (LOG, ">>$out" );
+
+    print( LOG "\n\n#################################################################\n\n\n" );
 
     #
     # read entire model file
@@ -180,9 +182,10 @@ sub processCommand {
     my @model = <MODEL>;
     close MODEL;
     
-    logText( $out, "+++++++++++++++++++++++++++++++++++\n" );
-    logText( $out, "MODEL:\n"     , @model   ."\n" );
-    logText( $out, "ARGUMENTS:\n" . $cmdline ."\n\n" );
+    print( LOG "+++++++++++++++++++++++++++++++++++\n" );
+    print( LOG "MODEL:\n" );
+    #print( LOG @model ."\n" );
+    print( LOG "ARGUMENTS:\n" . $cmdline ."\n\n" );
 
     $cmdline =~ s/%curdir%/$filepath/;
     $cmdline = $cmdline . " /v";    # add switch for verbose output
@@ -200,25 +203,25 @@ sub processCommand {
     my $ostderr_all = join( "", @ostderr );
     close OSTDERR;
     
-    logText( $out, "EXPECTED: " . $expresult ."\n" );
-    logText( $out, "ACTUAL:   " . $result    ."\n\n" );
+    print( LOG "EXPECTED: " . $expresult ."\n" );
+    print( LOG "ACTUAL:   " . $result    ."\n\n" );
 
     if ( $expresult ne $result ) {
-        logText( $out, "!!! FAILURE !!!\n" );
+        print( LOG "!!! FAILURE !!!\n" );
 
         print STDOUT "ERROR: was expecting " . $expresult . ", got " . $result . "\n";
-        logText( $out . $FAILLOG_FILE, "EXP: " . $expresult . " ACT: " . $result . "    " . $cmdline . "\n" );
+        print( LOG . $FAILLOG_FILE, "EXP: " . $expresult . " ACT: " . $result . "    " . $cmdline . "\n" );
     }
 
     if( $run_final eq false ) {
-        logText( $out, "+++++++++++++++++++++++++++++++++++\n\n" );
-        logText( $out, "STDOUT:" . "\n" );
-        logText( $out, $ostdout_all . "\n" );
+        print( LOG "+++++++++++++++++++++++++++++++++++\n\n" );
+        print( LOG "STDOUT:" . "\n" );
+        print( LOG $ostdout_all . "\n" );
     }
 
-    logText( $out, "+++++++++++++++++++++++++++++++++++\n\n" );
-    logText( $out, "STDERR:" . "\n" );
-    logText( $out, $ostderr_all  . "\n" );
+    print( LOG "+++++++++++++++++++++++++++++++++++\n\n" );
+    print( LOG "STDERR:" . "\n" );
+    print( LOG $ostderr_all  . "\n" );
 
     #
     # seeding testing
@@ -233,38 +236,24 @@ sub processCommand {
 	my @ostdout2 = <OSTDOUT2>;
         close OSTDOUT2;
 
-        logText( $out, "+++++++++++++++++++++++++++++++++++\n\n" );
-        logText( $out, "SEEDING: " );
+        print( LOG "+++++++++++++++++++++++++++++++++++\n\n" );
+        print( LOG "SEEDING: " );
 
         if ( @ostdout eq @ostdout2 ) {
-            logText( $out, "OK\n" );
+            print( LOG "OK\n" );
         } else {
-            logText( $out, "!!! FAILED !!!\n" );
+            print( LOG "!!! FAILED !!!\n" );
             print STDOUT "ERROR: seeding failure\n";
-            logText( $out . $FAILLOG_FILE, "Seeding failure    " . $cmdline . "\n" );
+            print( LOG . $FAILLOG_FILE, "Seeding failure    " . $cmdline . "\n" );
         }            
     }
+
+    close(LOG);
     
     unlink(".stdout");
     unlink(".stderr");
     unlink(".stdout2");
     unlink(".stderr2");
-}
-
-#############################################
-#
-# Logs a line of text
-#
-#############################################
-sub logText {
-    my $outfile;
-    my $line;
-
-    ( $outfile, $line ) = @_;
-
-    open (LOG, ">>$outfile" );
-    print LOG  $line;
-    close(LOG);
 }
 
 #############################################
