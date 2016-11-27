@@ -223,10 +223,10 @@ void Combination::ApplyExclusion( const Exclusion& excl )
 //
 //
 //
-bool Combination::ViolatesExclusion()
+TrackType Combination::GetTrackTypeOfFullyBoundCombination() const
 {
     size_t nKey = 0;
-    for( ParamCollection::iterator iter = m_params.begin(); iter != m_params.end(); ++iter )
+    for( ParamCollection::const_iterator iter = m_params.begin(); iter != m_params.end(); ++iter )
     {
         nKey *= ( *iter )->GetValueCount();
         size_t nCurrentVal = ( *iter )->GetLast();
@@ -234,7 +234,7 @@ bool Combination::ViolatesExclusion()
         nKey += nCurrentVal;
     }
 
-    return ( EXCLUDED == m_bitvec[ nKey ] );
+    return ( m_bitvec[ nKey ] );
 }
 
 //

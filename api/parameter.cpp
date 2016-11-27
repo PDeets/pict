@@ -76,20 +76,27 @@ int Parameter::PickValue()
 
         for (ComboCollection::iterator iter = m_combinations.begin(); iter != m_combinations.end(); ++iter)
         {
-            int zeros = (*iter)->Feasible();
-            totalZeros += zeros;
             if ((*iter)->GetBoundCount() >= (*iter)->GetParameterCount() - 1)
             {
-                if (zeros)
-                    ++complete;
-
-                if ((*iter)->ViolatesExclusion())
+                TrackType type = (*iter)->GetTrackTypeOfFullyBoundCombination();
+                if (type == EXCLUDED)
                 {
                     // make sure we don't pick this value, and move on
                     totalZeros = -1;
                     complete   = -1;
                     break;
                 }
+
+                if (type == OPEN)
+                {
+                    ++totalZeros;
+                    ++complete;
+                }
+            }
+            else
+            {
+                int zeros = (*iter)->Feasible();
+                totalZeros += zeros;
             }
         }
         if (complete > maxComplete)

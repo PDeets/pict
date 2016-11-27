@@ -332,7 +332,7 @@ public:
     int         Feasible();
 
     void ApplyExclusion( const Exclusion& excl );
-    bool ViolatesExclusion();
+    TrackType GetTrackTypeOfFullyBoundCombination() const;
 
     ParamCollection& GetParameters() { return m_params; }
     int  GetParameterCount() const { return static_cast<int>( m_params.size() ); }
