@@ -62,15 +62,12 @@ int Combination::Feasible()
     workbuf[ 0 ] = 0;
     for( Parameter* param : m_params )
     {
-        for( int i = 0; i < nWorkVals; i++ )
-        {
-            workbuf[ i ] *= param->GetValueCount();
-        }
         int nCurrentVal = (int) param->GetLast();
         if( param->GetBoundCount() )
         {
             for( int i = 0; i < nWorkVals; ++i )
             {
+                workbuf[i] *= param->GetValueCount();
                 workbuf[ i ] += nCurrentVal;
             }
         }
@@ -78,6 +75,7 @@ int Combination::Feasible()
         {
             for( int i = 0; i < nWorkVals; ++i )
             {
+                workbuf[i] *= param->GetValueCount();
                 for( int addend = 1; addend < param->GetValueCount(); ++addend )
                 {
                     workbuf[ i + nWorkVals*addend ] = workbuf[ i ] + addend;
